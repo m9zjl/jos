@@ -69,6 +69,14 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf) {
             cprintf(" %08x ", argi);
         }
         cprintf("\n");
+        // 显示当前的断点详情 https://github.com/shishujuan/mit6.828-2017/blob/master/docs/lab1-exercize.md
+        struct Eipdebuginfo debug_info;
+        debuginfo_eip(eip, &debug_info);
+        cprintf("\t%s:%d: %.*s+%d\n",
+                debug_info.eip_file, debug_info.eip_line, debug_info.eip_fn_namelen,
+                debug_info.eip_fn_name, eip - debug_info.eip_fn_addr);
+
+
         ebp = (uint32_t * ) * ebp;
     }
     return 0;
