@@ -25,6 +25,7 @@ struct Command {
 static struct Command commands[] = {
         {"help",     "Display this list of commands",        mon_help},
         {"kerninfo", "Display information about the kernel", mon_kerninfo},
+        {"backtrace", "Display a backtrace of the function stack", mon_backtrace},
 };
 
 /***** Implementations of basic kernel monitor commands *****/
@@ -58,6 +59,7 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf) {
     // Your code here.
     int i;
     uint32_t eip;
+    // using assemble  movl %%ebp,%0 to get the va of ebp
     uint32_t *ebp = (uint32_t *) read_ebp();
     while (ebp > 0) {
         eip = *(ebp + 1);
@@ -70,6 +72,7 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf) {
         }
         cprintf("\n");
         // 显示当前的断点详情 https://github.com/shishujuan/mit6.828-2017/blob/master/docs/lab1-exercize.md
+        // https://www.cnblogs.com/wuhualong/p/lab01_exercise12_print_more_info.html
         struct Eipdebuginfo debug_info;
         debuginfo_eip(eip, &debug_info);
         cprintf("\t%s:%d: %.*s+%d\n",
