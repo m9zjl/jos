@@ -102,6 +102,10 @@ boot_alloc(uint32_t n)
 	// to a multiple of PGSIZE.
 	//
 	// LAB 2: Your code here.
+	result = nextfree;
+	if(n>=0) {
+        nextfree = ROUNDUP(nextfree + n, PGSIZE);
+    }
 
 	return NULL;
 }
@@ -125,8 +129,9 @@ mem_init(void)
 	i386_detect_memory();
 
 	// Remove this line when you're ready to test this function.
-	panic("mem_init: This function is not finished\n");
-
+//	panic("mem_init: This function is not finished\n");
+    pages = (struct PageInfo *)boot_alloc(sizeof(struct PageInfo) * npages);
+    memset(pages, 0, npages * sizeof(struct PageInfo));
 	//////////////////////////////////////////////////////////////////////
 	// create initial page directory.
 	kern_pgdir = (pde_t *) boot_alloc(PGSIZE);
@@ -275,8 +280,15 @@ struct PageInfo *
 page_alloc(int alloc_flags)
 {
 	// Fill this function in
-	return 0;
-}
+    if (page_free_list) {
+        struct PageInfo *result = page_free_list;
+        page_free_list = page_free_list->pp_link;
+        if (alloc_flags & ALLOC_ZERO) {
+            memset(page2kva(result), 0, PGSIZE);
+        }
+        return result;
+    }
+    return NULL;}
 
 //
 // Return a page to the free list.
