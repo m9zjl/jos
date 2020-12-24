@@ -367,6 +367,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create) {
     pte_t *pte_ptr = pgdir + PDX(va);
     if (!(*pte_ptr & PTE_P)) {
         if (create) {
+            // 如果没有则申请一个4K的内存页并且将内存的地址（高地址？）赋值给pte_ptr这个page table entity
             struct PageInfo *pageInfo_ptr = page_alloc(1);
             if (pageInfo_ptr == NULL) {
                 return NULL;
@@ -442,6 +443,15 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm) {
 struct PageInfo *
 page_lookup(pde_t *pgdir, void *va, pte_t **pte_store) {
     // Fill this function in
+//    pte_t *page_table = pgdir_walk(pgdir, va, 0);
+//    if (page_table) {
+//        if (pte_store) {
+//            *pte_store = page_table;
+//        }
+//        return pa2page(PTE_ADDR(*page_table));
+//    }else{
+//        return &page_table;
+//    }
     return NULL;
 }
 
@@ -463,6 +473,7 @@ page_lookup(pde_t *pgdir, void *va, pte_t **pte_store) {
 void
 page_remove(pde_t *pgdir, void *va) {
     // Fill this function in
+
 }
 
 //

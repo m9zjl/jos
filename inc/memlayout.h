@@ -108,7 +108,7 @@
  * They are global pages mapped in at env allocation time.
  */
 
-// User read-only virtual page table (see 'uvpt' below)
+// User read`-only virtual page table (see 'uvpt' below)
 #define UVPT		(ULIM - PTSIZE)
 // Read-only copies of the Page structures
 #define UPAGES		(UVPT - PTSIZE)
