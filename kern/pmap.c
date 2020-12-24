@@ -395,6 +395,16 @@ pgdir_walk(pde_t *pgdir, const void *va, int create) {
 static void
 boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm) {
     // Fill this function in
+    // Fill this function in
+    pte_t *pgtab;
+    size_t end_addr = va + size;
+    for (;va < end_addr; va += PGSIZE, pa += PGSIZE) {
+        pgtab = pgdir_walk(pgdir, (void *)va, 1);
+        if (!pgtab) {
+            return;
+        }
+        *pgtab = pa | perm | PTE_P;
+    }
 }
 
 //
@@ -425,7 +435,21 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 int
 page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm) {
     // Fill this function in
-    pte_t *pte = pgdir_walk(pgdir, va, 1);
+    pte_t *pg_table = pgdir_walk(pgdir, va, 1);
+    if (!pg_table) {
+        return -E_NO_MEM;
+    }
+    // has enough memory
+    if (*pg_table & PTE_P) {
+        if (page2pa(pp) == PTE_ADDR(*pg_table)) {
+            *pg_table = page2pa(pp) | perm | PTE_P;
+            return 0;
+        } else {
+            page_remove(pgdir, va);
+        }
+    }
+    *pg_table = page2pa(pp) | perm | PTE_P;
+    pp->pp_ref++;
     return 0;
 }
 
@@ -443,16 +467,14 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm) {
 struct PageInfo *
 page_lookup(pde_t *pgdir, void *va, pte_t **pte_store) {
     // Fill this function in
-//    pte_t *page_table = pgdir_walk(pgdir, va, 0);
-//    if (page_table) {
-//        if (pte_store) {
-//            *pte_store = page_table;
-//        }
-//        return pa2page(PTE_ADDR(*page_table));
-//    }else{
-//        return &page_table;
-//    }
-    return NULL;
+    pte_t *page_table = pgdir_walk(pgdir, va, 0);
+    if (!page_table) {
+        return NULL;
+    }
+    if (pte_store) {
+        *pte_store = page_table;
+    }
+    return pa2page(PTE_ADDR(*page_table));
 }
 
 //
@@ -473,7 +495,16 @@ page_lookup(pde_t *pgdir, void *va, pte_t **pte_store) {
 void
 page_remove(pde_t *pgdir, void *va) {
     // Fill this function in
-
+    // Fill this function in
+    pte_t *pgtab;
+    pte_t **pte_store = &pgtab;
+    struct PageInfo *pInfo = page_lookup(pgdir, va, pte_store);
+    if (!pInfo) {
+        return;
+    }
+    page_decref(pInfo);
+    *pgtab = 0;  // 将内容清0，即无法再根据页表内容得到物理地址。
+    tlb_invalidate(pgdir, va);  // 通知tlb失效。tlb是个高速缓存，用来缓存查找记录增加查找速度。
 }
 
 //
