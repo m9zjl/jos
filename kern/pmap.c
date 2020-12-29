@@ -179,7 +179,7 @@ mem_init(void) {
     //      (ie. perm = PTE_U | PTE_P)
     //    - pages itself -- kernel RW, user NONE
     // Your code goes here:
-//	boot_map_region(kern_pgdir,UENVS,PTSIZE,PADDR(envs),PTE_U);
+    boot_map_region(kern_pgdir, (uintptr_t) UPAGES, PTSIZE, PADDR(pages), PTE_U | PTE_P);
 
     //////////////////////////////////////////////////////////////////////
     // Use the physical memory that 'bootstack' refers to as the kernel
@@ -192,17 +192,18 @@ mem_init(void) {
     //       overwrite memory.  Known as a "guard page".
     //     Permissions: kernel RW, user NONE
     // Your code goes here:
-//	boot_map_region(kern_pgdir,KSTCKTOP-KSTAKSIZE,KSTKSIZE,PADDR(bootstack),PTE_W);
+    boot_map_region(kern_pgdir, (uintptr_t) KSTACKTOP - KSTKSIZE, KSTKSIZE, PADDR(bootstack), PTE_W | PTE_P);
+
 
     //////////////////////////////////////////////////////////////////////
     // Map all of physical memory at KERNBASE.
-    // Ie.  the VA range [KERNBASE, 2^32) should map to
+    // Ie.  the VA rang e [KERNBASE, 2^32) should map to
     //      the PA range [0, 2^32 - KERNBASE)
     // We might not have 2^32 - KERNBASE bytes of physical memory, but
     // we just set up the mapping anyway.
     // Permissions: kernel RW, user NONE
     // Your code goes here:
-//	boot_map_region(kern_pgdir,KERNBASE,0xffffffff - KERNBASE,0,PTE_W);
+    boot_map_region(kern_pgdir, KERNBASE, 0xffffffff - KERNBASE, 0, PTE_W | PTE_P);
 
     // Check that the initial page directory has been set up correctly.
     check_kern_pgdir();
@@ -304,7 +305,6 @@ page_alloc(int alloc_flags) {
     }
     page_free_list = page_free_list->pp_link;
     result->pp_link = NULL;
-    result->pp_ref = 1;
     if (alloc_flags && ALLOC_ZERO) {
         // result is virtual address, we should change it into physical address
         memset(page2kva(result), 0, PGSIZE);
@@ -378,7 +378,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create) {
             return NULL;
         }
     }
-    return KADDR(PTE_ADDR(*pte_ptr)) + PTX(va);
+    return (uint32_t *) KADDR(PTE_ADDR(*pte_ptr)) + PTX(va);
 }
 
 //
@@ -398,14 +398,33 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
     // Fill this function in
     pte_t *pgtab;
     size_t end_addr = va + size;
-    for (;va < end_addr; va += PGSIZE, pa += PGSIZE) {
-        pgtab = pgdir_walk(pgdir, (void *)va, 1);
+    pte_t base = va;
+    // va +=PGSIZE may overflow, like va = 0xf0000000 + 0x1000000 = 0x00000000
+    // so add the condition va >=base in case it overflows
+    for (; va >= base && va < end_addr; va += PGSIZE, pa += PGSIZE) {
+        pgtab = pgdir_walk(pgdir, (void *) va, 1);
         if (!pgtab) {
             return;
         }
         *pgtab = pa | perm | PTE_P;
     }
+
+    // Fill this function in
+//    pte_t *pgtab;
+//    size_t pg_num = PGNUM(size);
+//    cprintf("map region size = %d, %d pages\n",size, pg_num);
+//    for (size_t i=0; i<pg_num; i++) {
+//        pgtab = pgdir_walk(pgdir, (void *)va, 1);
+//        if (!pgtab) {
+//            return;
+//        }
+//        //cprintf("va = %p\n", va);
+//        *pgtab = pa | perm | PTE_P;
+//        va += PGSIZE;
+//        pa += PGSIZE;
+//    }
 }
+
 
 //
 // Map the physical page 'pp' at virtual address 'va'.
@@ -657,7 +676,7 @@ check_page_alloc(void) {
         --nfree;
     assert(nfree == 0);
 
-    cprintf("check_page_alloc() succeeded!\n");
+    cprintf("\ncheck_page_alloc() succeeded!\n");
 }
 
 //
@@ -878,7 +897,7 @@ check_page(void) {
     page_free(pp1);
     page_free(pp2);
 
-    cprintf("check_page() succeeded!\n");
+    cprintf("\ncheck_page() succeeded!\n");
 }
 
 // check page_insert, page_remove, &c, with an installed kern_pgdir
