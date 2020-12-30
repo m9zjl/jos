@@ -185,6 +185,17 @@ env_setup_vm(struct Env *e)
 	//    - The functions in kern/pmap.h are handy.
 
 	// LAB 3: Your code here.
+	p->pp_ref += 1;
+    e->env_pgdir = (pde_t *)page2kva(p);
+
+    //Map the directory below UTOP.
+    for (i = 0; i < PDX(UTOP); i++)
+        e->env_pgdir[i] = 0;
+
+    //Map the directory above UTOP
+    for (i = PDX(UTOP); i < NPDENTRIES; i++) {
+        e->env_pgdir[i] = kern_pgdir[i];
+    }
 
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
@@ -329,11 +340,39 @@ load_icode(struct Env *e, uint8_t *binary)
 	//  What?  (See env_run() and env_pop_tf() below.)
 
 	// LAB 3: Your code here.
+    struct Elf* header = (struct Elf*)binary;
 
-	// Now map one page for the program's initial stack
+    if (header->e_magic != ELF_MAGIC)
+        panic("load_icode failed: The binary we load is not elf.\n");
+
+    if (header->e_entry == 0)
+        panic("load_icode failed: The elf file can't be excuterd.\n");
+
+    e->env_tf.tf_eip = header->e_entry;
+
+    lcr3(PADDR(e->env_pgdir));   //load user pgdir
+
+    struct Proghdr *ph, *eph;
+    ph = (struct Proghdr* )((uint8_t *)header + header->e_phoff);
+    eph = ph + header->e_phnum;
+    for(; ph < eph; ph++) {
+        if(ph->p_type == ELF_PROG_LOAD) {
+            if(ph->p_memsz - ph->p_filesz < 0)
+                panic("load icode failed : p_memsz < p_filesz.\n");
+
+            region_alloc(e, (void *)ph->p_va, ph->p_memsz);
+            memmove((void *)ph->p_va, binary + ph->p_offset, ph->p_filesz);
+            memset((void *)(ph->p_va + ph->p_filesz), 0, ph->p_memsz - ph->p_filesz);
+        }
+    }
+
+    // Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
 
 	// LAB 3: Your code here.
+    region_alloc(e,(void *)(USTACKTOP-PGSIZE), PGSIZE);
+
+    //TODO load url https://blog.csdn.net/bysui/article/details/51533792
 }
 
 //
@@ -347,6 +386,11 @@ void
 env_create(uint8_t *binary, enum EnvType type)
 {
 	// LAB 3: Your code here.
+    struct Env *new_env;
+
+    env_alloc(&new_env, 0); // allocates and initialize a new process
+    load_icode(new_env, binary);
+    new_env->env_type = type;
 }
 
 //
@@ -463,7 +507,15 @@ env_run(struct Env *e)
 	//	e->env_tf to sensible values.
 
 	// LAB 3: Your code here.
-
-	panic("env_run not yet implemented");
+    if (curenv) {
+        if (curenv->env_status == ENV_RUNNING)  // what other states can it be in?
+            curenv->env_status = ENV_RUNNABLE;
+    }
+    curenv = e;
+    curenv->env_status = ENV_RUNNING;
+    ++curenv->env_runs;
+    lcr3(PADDR(curenv->env_pgdir));
+    env_pop_tf(&curenv->env_tf);
+//	panic("env_run not yet implemented");
 }
 

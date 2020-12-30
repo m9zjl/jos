@@ -376,7 +376,7 @@ page_decref(struct PageInfo *pp) {
 //
 // Hint 3: look at inc/mmu.h for useful macros that manipulate page
 // table and page directory entries.
-//
+// return the kernal address
 pte_t *
 pgdir_walk(pde_t *pgdir, const void *va, int create) {
     // Fill this function in
@@ -617,7 +617,7 @@ check_page_free_list(bool only_low_memory) {
     if (only_low_memory) {
         // Move pages with lower addresses first in the free
         // list, since entry_pgdir does not map all pages.
-        struct PageInfo *pp1, *pp2;
+        struct PageInfo *pp1, *pp2pdx_limit;
         struct PageInfo **tp[2] = {&pp1, &pp2};
         for (pp = page_free_list; pp; pp = pp->pp_link) {
             int pagetype = PDX(page2pa(pp)) >= pdx_limit;
@@ -632,7 +632,7 @@ check_page_free_list(bool only_low_memory) {
     // if there's a page that shouldn't be on the free list,
     // try to make sure it eventually causes trouble.
     for (pp = page_free_list; pp; pp = pp->pp_link)
-        if (PDX(page2pa(pp)) < pdx_limit)
+        if (PDX(page2pa(pp)) < )
             memset(page2kva(pp), 0x97, 128);
 
     first_free_page = (char *) boot_alloc(0);
